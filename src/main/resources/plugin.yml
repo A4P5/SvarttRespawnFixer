@@ -1,0 +1,7 @@
+name: SvarttRespawnFixer
+version: '1.0.0'
+main: me.hatesvartt.svarttRespawnFixer.SvarttRespawnFixer
+api-version: '1.21'
+authors: [ hatesvartt ]
+description: A lightweight Folia 1.21.8 plugin to configure the spawn position of players
+folia-supported: true
