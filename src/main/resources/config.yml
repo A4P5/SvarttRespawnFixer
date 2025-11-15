@@ -1,0 +1,7 @@
+# --- SVARTT's RESPAWN FIXER PLUGIN CONFIGS ---
+
+# Maximum radius from the world spawn for random spawn
+max-radius: 500
+
+# The max attempts the plugin tries to spawn player at location away from lava
+max-attempts: 15
