@@ -12,6 +12,7 @@ public final class SvarttRespawnFixer extends JavaPlugin {
       
         Bukkit.getPluginManager().registerEvents(new SpawnListener(this), this);
         getLogger().info("SvarttRespawnFixer enabled!");
+        getLogger().info("SvarttRespawnFixer has been produced by hatesvratt and Ainomia.\nIt has been designed for use on the AINOMIA server.\nSupport for implementation on your own server will not be provided.\nRespawn logic produced by Ainomia\nPlugin base created by hatesvratt");
     }
 
     @Override
