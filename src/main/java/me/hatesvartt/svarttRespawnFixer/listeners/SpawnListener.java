@@ -2,13 +2,17 @@ package me.hatesvartt.svarttRespawnFixer.listeners;
 
 import me.hatesvartt.svarttRespawnFixer.SvarttRespawnFixer;
 import org.bukkit.Location;
+import org.bukkit.Material;
 import org.bukkit.World;
 import org.bukkit.configuration.file.FileConfiguration;
+import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
-import org.bukkit.event.player.PlayerRespawnEvent;
+import org.bukkit.event.entity.PlayerDeathEvent;
+import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
 
 import java.util.Random;
+import java.util.function.Consumer;
 
 public class SpawnListener implements Listener {
 
@@ -25,46 +29,57 @@ public class SpawnListener implements Listener {
     }
 
     @EventHandler
-    public void onPlayerRespawn(PlayerRespawnEvent event) {
+    public void onPlayerDeath(PlayerDeathEvent event) {
+        Player player = event.getEntity();
 
-        if (event.isBedSpawn() || event.isAnchorSpawn()) {
+        plugin.getServer().getGlobalRegionScheduler().runAtFixedRate(plugin, schedulerTask -> {
+            if (!player.isOnline()) {
+                schedulerTask.cancel();
+                return;
+            }
+
+            if (!player.isDead()) {
+                Location bedSpawn = player.getBedSpawnLocation();
+                if (bedSpawn != null) {
+                    player.teleportAsync(bedSpawn);
+                } else {
+                    spawnRandomSafe(player.getWorld(), loc -> player.teleportAsync(loc));
+                }
+                schedulerTask.cancel();
+            }
+        }, 1L, 1L);
+    }
+
+    private void spawnRandomSafe(World world, Consumer<Location> callback) {
+        attemptSpawn(world, 0, callback, null);
+    }
+
+    private void attemptSpawn(World world, int attempt, Consumer<Location> callback, Location lastLocation) {
+        if (attempt >= maxAttempts) {
+            if (lastLocation != null) {
+                Location fallback = lastLocation.clone().add(0, 1, 0);
+                plugin.getServer().getRegionScheduler().run(plugin, world, fallback.getChunk().getX(), fallback.getChunk().getZ(), task -> {
+                    callback.accept(fallback);
+                });
+            }
             return;
         }
 
-        plugin.getServer().getScheduler().runTask(plugin, () -> {
-            World world = event.getPlayer().getWorld();
-            Location randomSpawn = getRandomSpawn(world);
-            event.setRespawnLocation(randomSpawn);
-        });
-    }
+        double angle = random.nextDouble() * 2 * Math.PI;
+        double radius = random.nextDouble() * maxRadius;
+        int x = (int) (radius * Math.cos(angle));
+        int z = (int) (radius * Math.sin(angle));
 
-    private Location getRandomSpawn(World world) {
-        int centerX = 0; // center X coordinate
-        int centerZ = 0; // center Z coordinate
-        Location lastLocation = null;
-        int attempts = 0;
-
-        while (attempts < maxAttempts) { 
-            attempts++;
-
-            double angle = random.nextDouble() * 2 * Math.PI;
-            double radius = random.nextDouble() * maxRadius;
-
-            int blockX = (int) (centerX + radius * Math.cos(angle));
-            int blockZ = (int) (centerZ + radius * Math.sin(angle));
-
-            int y = world.getHighestBlockYAt(blockX, blockZ);
-            Location loc = new Location(world, blockX, y, blockZ);
-            lastLocation = loc.clone(); // store last generated location
+        plugin.getServer().getRegionScheduler().run(plugin, world, x >> 4, z >> 4, task -> {
+            int y = world.getHighestBlockYAt(x, z);
+            Location loc = new Location(world, x, y, z);
 
             if (!loc.getBlock().getType().name().contains("LAVA") &&
-                    !loc.clone().subtract(0,1,0).getBlock().getType().name().contains("LAVA")) {
-                // safe spot found!
-                return loc.add(0, 1, 0);
+                    !loc.clone().subtract(0, 1, 0).getBlock().getType().name().contains("LAVA")) {
+                callback.accept(loc.add(0, 1, 0));
+            } else {
+                attemptSpawn(world, attempt + 1, callback, loc);
             }
-        }
-
-        // if all attempts fail: fallback to world spawn height
-        return lastLocation.add(0, 1, 0);
+        });
     }
 }
