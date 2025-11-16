@@ -12,6 +12,7 @@ import org.bukkit.event.entity.PlayerDeathEvent;
 import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
 
 import java.util.Random;
+import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
 
 public class SpawnListener implements Listener {
@@ -39,16 +40,28 @@ public class SpawnListener implements Listener {
             }
 
             if (!player.isDead()) {
-                Location bedSpawn = player.getBedSpawnLocation();
-                if (bedSpawn != null) {
-                    player.teleportAsync(bedSpawn);
-                } else {
-                    spawnRandomSafe(player.getWorld(), loc -> player.teleportAsync(loc));
-                }
+                player.getScheduler().runAtFixedRate(plugin, entityTask -> {
+                    Location bedSpawn = null;
+                    try {
+                        bedSpawn = player.getBedSpawnLocation();
+                    } catch (Exception e) {
+                        // if it's not accessible, bedSpawn stays null
+                    }
+
+                    if (bedSpawn != null) {
+                        player.teleportAsync(bedSpawn);
+                    } else {
+                        spawnRandomSafe(player.getWorld(), loc -> player.teleportAsync(loc));
+                    }
+
+                    entityTask.cancel();
+                }, null, 1L, 1L);
+
                 schedulerTask.cancel();
             }
         }, 1L, 1L);
     }
+
 
     private void spawnRandomSafe(World world, Consumer<Location> callback) {
         attemptSpawn(world, 0, callback, null);
